@@ -1,0 +1,1768 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expense &amp; Budget Visualizer</title>
+  <style>
+    /* =============================================
+       CSS Custom Properties — Light Theme (default)
+       ============================================= */
+    :root,
+    [data-theme="light"] {
+      --color-bg:           #f5f7fa;
+      --color-surface:      #ffffff;
+      --color-surface-alt:  #eef1f6;
+      --color-border:       #d1d9e0;
+      --color-text:         #1a1d23;
+      --color-text-muted:   #6b7280;
+      --color-primary:      #4e79a7;
+      --color-primary-hover:#3a5f8a;
+      --color-danger:       #e15759;
+      --color-danger-hover: #c43e40;
+      --color-success:      #59a14f;
+      --color-warning-bg:   #fff3cd;
+      --color-warning-text: #856404;
+      --color-warning-border:#ffc107;
+
+      --shadow-sm:  0 1px 3px rgba(0,0,0,0.08);
+      --shadow-md:  0 4px 12px rgba(0,0,0,0.10);
+
+      --radius-sm:  4px;
+      --radius-md:  8px;
+      --radius-lg:  12px;
+
+      --spacing-xs: 4px;
+      --spacing-sm: 8px;
+      --spacing-md: 16px;
+      --spacing-lg: 24px;
+      --spacing-xl: 32px;
+
+      --font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --font-size-sm:   0.875rem;
+      --font-size-base: 1rem;
+      --font-size-lg:   1.125rem;
+      --font-size-xl:   1.375rem;
+      --font-size-2xl:  1.75rem;
+      --font-weight-normal: 400;
+      --font-weight-medium: 500;
+      --font-weight-bold:   700;
+      --line-height: 1.5;
+    }
+
+    /* =============================================
+       CSS Custom Properties — Dark Theme
+       ============================================= */
+    [data-theme="dark"] {
+      --color-bg:           #0f1117;
+      --color-surface:      #1c1f2b;
+      --color-surface-alt:  #252836;
+      --color-border:       #353848;
+      --color-text:         #e8eaf0;
+      --color-text-muted:   #9ca3af;
+      --color-primary:      #6fa3d4;
+      --color-primary-hover:#8bbde0;
+      --color-danger:       #f07072;
+      --color-danger-hover: #f59091;
+      --color-success:      #7ec473;
+      --color-warning-bg:   #2d2510;
+      --color-warning-text: #fcd34d;
+      --color-warning-border:#d97706;
+
+      --shadow-sm:  0 1px 3px rgba(0,0,0,0.30);
+      --shadow-md:  0 4px 12px rgba(0,0,0,0.40);
+    }
+
+    /* =============================================
+       Reset & Base
+       ============================================= */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      font-size: 16px;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--font-family);
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-normal);
+      line-height: var(--line-height);
+      color: var(--color-text);
+      background-color: var(--color-bg);
+      min-height: 100vh;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    /* =============================================
+       Typography
+       ============================================= */
+    h1 { font-size: var(--font-size-2xl); font-weight: var(--font-weight-bold); }
+    h2 { font-size: var(--font-size-xl);  font-weight: var(--font-weight-bold); }
+    h3 { font-size: var(--font-size-lg);  font-weight: var(--font-weight-medium); }
+
+    /* =============================================
+       Layout — App Shell
+       ============================================= */
+    .app-wrapper {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 var(--spacing-md);
+    }
+
+    /* =============================================
+       Header
+       ============================================= */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--spacing-md) 0;
+      border-bottom: 1px solid var(--color-border);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .app-header__title {
+      color: var(--color-primary);
+    }
+
+    /* =============================================
+       Storage Warning Banner
+       ============================================= */
+    .storage-banner {
+      display: none; /* shown via JS when localStorage unavailable */
+      background-color: var(--color-warning-bg);
+      color: var(--color-warning-text);
+      border: 1px solid var(--color-warning-border);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-sm) var(--spacing-md);
+      margin-bottom: var(--spacing-md);
+      font-size: var(--font-size-sm);
+    }
+
+    .storage-banner[aria-hidden="false"] {
+      display: block;
+    }
+
+    /* =============================================
+       Main Content Grid
+       ============================================= */
+    .app-main {
+      display: grid;
+      gap: var(--spacing-lg);
+      /* Mobile: single column by default */
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        "balance"
+        "form"
+        "chart"
+        "list"
+        "summary";
+    }
+
+    /* =============================================
+       Card / Surface
+       ============================================= */
+    .card {
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-lg);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .card__title {
+      margin-bottom: var(--spacing-md);
+      color: var(--color-text);
+    }
+
+    /* =============================================
+       Balance Display Section
+       ============================================= */
+    .balance-section {
+      grid-area: balance;
+    }
+
+    .balance-display {
+      text-align: center;
+    }
+
+    .balance-display__label {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .balance-display__amount {
+      font-size: var(--font-size-2xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-primary);
+    }
+
+    /* =============================================
+       Transaction Form Section
+       ============================================= */
+    .form-section {
+      grid-area: form;
+    }
+
+    .transaction-form {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-md);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-xs);
+    }
+
+    .form-group label {
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--color-text);
+    }
+
+    .form-group input,
+    .form-group select {
+      padding: var(--spacing-sm) var(--spacing-md);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background-color: var(--color-surface-alt);
+      color: var(--color-text);
+      font-size: var(--font-size-base);
+      font-family: var(--font-family);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(78, 121, 167, 0.2);
+    }
+
+    .form-group input[aria-invalid="true"],
+    .form-group select[aria-invalid="true"] {
+      border-color: var(--color-danger);
+    }
+
+    .form-error {
+      font-size: var(--font-size-sm);
+      color: var(--color-danger);
+      min-height: 1.2em;
+    }
+
+    /* =============================================
+       Buttons
+       ============================================= */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-xs);
+      padding: var(--spacing-sm) var(--spacing-lg);
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-base);
+      font-family: var(--font-family);
+      font-weight: var(--font-weight-medium);
+      cursor: pointer;
+      transition: background-color 0.15s ease, transform 0.1s ease;
+      text-decoration: none;
+    }
+
+    .btn:active { transform: scale(0.98); }
+
+    .btn--primary {
+      background-color: var(--color-primary);
+      color: #ffffff;
+      width: 100%;
+    }
+
+    .btn--primary:hover { background-color: var(--color-primary-hover); }
+
+    .btn--danger {
+      background-color: transparent;
+      color: var(--color-danger);
+      border: 1px solid var(--color-danger);
+      padding: var(--spacing-xs) var(--spacing-sm);
+      font-size: var(--font-size-sm);
+    }
+
+    .btn--danger:hover {
+      background-color: var(--color-danger);
+      color: #ffffff;
+    }
+
+    .btn--icon {
+      background: none;
+      border: none;
+      padding: var(--spacing-xs);
+      cursor: pointer;
+      color: var(--color-text-muted);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-lg);
+      line-height: 1;
+    }
+
+    .btn--icon:hover { color: var(--color-text); background-color: var(--color-surface-alt); }
+
+    /* =============================================
+       Theme Toggle
+       ============================================= */
+    .theme-toggle {
+      /* rendered by ThemeToggle JS component */
+    }
+
+    .theme-toggle__btn {
+      font-size: 1.375rem;
+      padding: var(--spacing-xs) var(--spacing-sm);
+      border-radius: var(--radius-md);
+      transition: background-color 0.15s ease;
+    }
+
+    .theme-toggle__btn:hover {
+      background-color: var(--color-surface-alt);
+    }
+
+    /* =============================================
+       Pie Chart Section
+       ============================================= */
+    .chart-section {
+      grid-area: chart;
+    }
+
+    .pie-chart-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--spacing-md);
+    }
+
+    .pie-chart-canvas {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .pie-chart-legend {
+      width: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-sm);
+      justify-content: center;
+    }
+
+    .pie-chart-legend__item {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      font-size: var(--font-size-sm);
+    }
+
+    .pie-chart-legend__swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .pie-chart-empty {
+      text-align: center;
+      color: var(--color-text-muted);
+      padding: var(--spacing-xl) 0;
+      font-size: var(--font-size-sm);
+    }
+
+    /* =============================================
+       Transaction List Section
+       ============================================= */
+    .list-section {
+      grid-area: list;
+    }
+
+    .transaction-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+      max-height: 400px;
+      overflow-y: auto;
+      padding-right: var(--spacing-xs); /* room for scrollbar */
+    }
+
+    .transaction-list::-webkit-scrollbar { width: 6px; }
+    .transaction-list::-webkit-scrollbar-track { background: var(--color-surface-alt); border-radius: 3px; }
+    .transaction-list::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+
+    .transaction-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--spacing-sm);
+      padding: var(--spacing-sm) var(--spacing-md);
+      background-color: var(--color-surface-alt);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-border);
+    }
+
+    .transaction-item__info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .transaction-item__name {
+      font-weight: var(--font-weight-medium);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .transaction-item__meta {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+    }
+
+    .transaction-item__amount {
+      font-weight: var(--font-weight-bold);
+      color: var(--color-primary);
+      white-space: nowrap;
+    }
+
+    .transaction-list-empty {
+      text-align: center;
+      color: var(--color-text-muted);
+      padding: var(--spacing-lg) 0;
+      font-size: var(--font-size-sm);
+    }
+
+    /* =============================================
+       Monthly Summary Section
+       ============================================= */
+    .summary-section {
+      grid-area: summary;
+    }
+
+    .monthly-summary-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .monthly-summary-table th,
+    .monthly-summary-table td {
+      padding: var(--spacing-sm) var(--spacing-md);
+      text-align: left;
+      border-bottom: 1px solid var(--color-border);
+      font-size: var(--font-size-sm);
+    }
+
+    .monthly-summary-table th {
+      font-weight: var(--font-weight-medium);
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .monthly-summary-table td:last-child {
+      text-align: right;
+      font-weight: var(--font-weight-medium);
+    }
+
+    .monthly-summary-empty {
+      text-align: center;
+      color: var(--color-text-muted);
+      padding: var(--spacing-lg) 0;
+      font-size: var(--font-size-sm);
+    }
+
+    /* =============================================
+       Category Manager Section
+       ============================================= */
+    .category-section {
+      /* on mobile, rendered inside form-section card */
+    }
+
+    .category-form {
+      display: flex;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-md);
+    }
+
+    .category-form input {
+      flex: 1;
+      padding: var(--spacing-sm) var(--spacing-md);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background-color: var(--color-surface-alt);
+      color: var(--color-text);
+      font-size: var(--font-size-base);
+      font-family: var(--font-family);
+    }
+
+    .category-form input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(78, 121, 167, 0.2);
+    }
+
+    .category-form .btn--primary {
+      width: auto;
+      white-space: nowrap;
+    }
+
+    .category-list {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-xs);
+    }
+
+    .category-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: var(--spacing-xs) var(--spacing-sm);
+      background-color: var(--color-surface-alt);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      font-size: var(--font-size-sm);
+      color: var(--color-text);
+    }
+
+    /* =============================================
+       Responsive Layout — Desktop (≥ 768px)
+       ============================================= */
+    @media (min-width: 768px) {
+      .app-main {
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+          "form    balance"
+          "form    chart"
+          "form    list"
+          "summary summary";
+      }
+
+      /* Left column: form + category manager stacked */
+      .form-section {
+        grid-row: span 3;
+        align-self: start;
+      }
+
+      /* Right column items */
+      .balance-section,
+      .chart-section,
+      .list-section {
+        align-self: start;
+      }
+
+      /* Monthly summary spans full width */
+      .summary-section {
+        grid-column: 1 / -1;
+      }
+
+      .btn--primary {
+        width: auto;
+      }
+    }
+
+    /* =============================================
+       Responsive Layout — Wide Desktop (≥ 1024px)
+       ============================================= */
+    @media (min-width: 1024px) {
+      .app-wrapper {
+        padding: 0 var(--spacing-xl);
+      }
+    }
+
+    /* =============================================
+       Accessibility — Focus Visible
+       ============================================= */
+    :focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+
+    /* =============================================
+       Utility
+       ============================================= */
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-wrapper">
+
+    <!-- Storage Unavailable Banner -->
+    <div
+      id="storage-banner"
+      class="storage-banner"
+      role="alert"
+      aria-hidden="true"
+      aria-live="polite"
+    >
+      ⚠️ Storage unavailable — data will not be saved.
+    </div>
+
+    <!-- ==================== Header ==================== -->
+    <header class="app-header" role="banner">
+      <h1 class="app-header__title">💰 Expense &amp; Budget Visualizer</h1>
+      <!-- ThemeToggle component renders here -->
+      <div id="theme-toggle-container" class="theme-toggle" aria-label="Theme toggle"></div>
+    </header>
+
+    <!-- ==================== Main Content ==================== -->
+    <main class="app-main" id="app-main" role="main">
+
+      <!-- Balance Display -->
+      <section class="balance-section card" aria-labelledby="balance-heading">
+        <h2 id="balance-heading" class="card__title">Current Balance</h2>
+        <!-- BalanceDisplay component renders here -->
+        <div id="balance-display-container" class="balance-display">
+          <p class="balance-display__label">Total Spending</p>
+          <p class="balance-display__amount" aria-live="polite" aria-atomic="true">$0.00</p>
+        </div>
+      </section>
+
+      <!-- Transaction Form + Category Manager -->
+      <section class="form-section card" aria-labelledby="form-heading">
+        <h2 id="form-heading" class="card__title">Add Transaction</h2>
+        <!-- TransactionForm component renders here -->
+        <div id="transaction-form-container"></div>
+
+        <hr style="border:none; border-top:1px solid var(--color-border); margin: var(--spacing-lg) 0;" />
+
+        <h3 class="card__title" id="category-heading">Manage Categories</h3>
+        <!-- CategoryManager component renders here -->
+        <div id="category-manager-container" class="category-section" aria-labelledby="category-heading"></div>
+      </section>
+
+      <!-- Pie Chart -->
+      <section class="chart-section card" aria-labelledby="chart-heading">
+        <h2 id="chart-heading" class="card__title">Spending by Category</h2>
+        <!-- PieChart component renders here -->
+        <div id="pie-chart-container" class="pie-chart-container">
+          <canvas
+            id="pie-chart-canvas"
+            class="pie-chart-canvas"
+            width="280"
+            height="280"
+            role="img"
+            aria-label="Pie chart showing spending by category"
+          ></canvas>
+          <div id="pie-chart-legend" class="pie-chart-legend" aria-label="Chart legend"></div>
+        </div>
+      </section>
+
+      <!-- Transaction List -->
+      <section class="list-section card" aria-labelledby="list-heading">
+        <h2 id="list-heading" class="card__title">Transactions</h2>
+        <!-- TransactionList component renders here -->
+        <div id="transaction-list-container">
+          <ul
+            id="transaction-list"
+            class="transaction-list"
+            aria-label="Transaction list"
+            aria-live="polite"
+          ></ul>
+        </div>
+      </section>
+
+      <!-- Monthly Summary -->
+      <section class="summary-section card" aria-labelledby="summary-heading">
+        <h2 id="summary-heading" class="card__title">Monthly Summary</h2>
+        <!-- MonthlySummary component renders here -->
+        <div id="monthly-summary-container"></div>
+      </section>
+
+    </main><!-- /#app-main -->
+  </div><!-- /.app-wrapper -->
+
+  <!-- =============================================
+       JavaScript Modules (added in subsequent tasks)
+       =============================================
+
+    Task 2: StorageModule IIFE
+    Task 3: State Module IIFE + data models
+    Task 4: Validation Module IIFE
+    Task 6: TransactionForm UI component
+    Task 7: CategoryManager UI component
+    Task 8: TransactionList + BalanceDisplay UI components
+    Task 9: PieChart UI component
+    Task 10: MonthlySummary UI component
+    Task 11: ThemeToggle UI component
+    Task 12: AppController IIFE + DOMContentLoaded bootstrap
+  -->
+  <script>
+    // =============================================
+    // StorageModule — wraps all localStorage I/O
+    // Requirements: 9.1, 9.2, 9.3, 9.4
+    // =============================================
+    var StorageModule = (function () {
+      /**
+       * Serialize value to JSON and write to localStorage.
+       * @param {string} key
+       * @param {*} value
+       */
+      function save(key, value) {
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+        } catch (e) {
+          // Storage may be full or unavailable — silently fail
+        }
+      }
+
+      /**
+       * Read from localStorage, parse JSON, and return the value.
+       * Returns null on any error (missing key, parse failure, unavailability).
+       * @param {string} key
+       * @returns {*|null}
+       */
+      function load(key) {
+        try {
+          var raw = localStorage.getItem(key);
+          if (raw === null) {
+            return null;
+          }
+          return JSON.parse(raw);
+        } catch (e) {
+          console.error('StorageModule.load: failed to parse value for key "' + key + '"', e);
+          return null;
+        }
+      }
+
+      /**
+       * Test whether localStorage is available by writing and removing a sentinel key.
+       * @returns {boolean}
+       */
+      function isAvailable() {
+        var sentinel = '__storage_test__';
+        try {
+          localStorage.setItem(sentinel, '1');
+          localStorage.removeItem(sentinel);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      return {
+        save: save,
+        load: load,
+        isAvailable: isAvailable
+      };
+    })();
+
+    // =============================================
+    // State Module — in-memory application state
+    // Requirements: 1.2, 2.1, 3.1, 4.1, 5.1, 6.1, 9.3
+    // =============================================
+    var State = (function () {
+      var DEFAULT_CATEGORIES = ['Food', 'Transport', 'Housing', 'Entertainment', 'Health', 'Other'];
+
+      var STORAGE_KEYS = {
+        transactions: 'evb_transactions',
+        categories:   'evb_categories',
+        theme:        'evb_theme'
+      };
+
+      // In-memory state — loaded from localStorage on init
+      var transactions = [];
+      var categories   = DEFAULT_CATEGORIES.slice();
+      var theme        = 'light';
+
+      // Load persisted state from localStorage
+      (function init() {
+        var savedTx   = StorageModule.load(STORAGE_KEYS.transactions);
+        var savedCats = StorageModule.load(STORAGE_KEYS.categories);
+        var savedTheme = StorageModule.load(STORAGE_KEYS.theme);
+
+        if (Array.isArray(savedTx))   { transactions = savedTx; }
+        if (Array.isArray(savedCats)) { categories   = savedCats; }
+        if (savedTheme === 'light' || savedTheme === 'dark') { theme = savedTheme; }
+      })();
+
+      /**
+       * Generate a unique ID for a transaction.
+       * @returns {string}
+       */
+      function generateId() {
+        return Date.now().toString(36) + Math.random().toString(36).slice(2);
+      }
+
+      /**
+       * Add a transaction. Assigns a generated id and current ISO date if not provided.
+       * @param {{ name: string, amount: number, category: string, date?: string }} tx
+       */
+      function addTransaction(tx) {
+        var entry = {
+          id:       generateId(),
+          name:     tx.name,
+          amount:   tx.amount,
+          category: tx.category,
+          date:     tx.date || new Date().toISOString()
+        };
+        transactions.push(entry);
+        StorageModule.save(STORAGE_KEYS.transactions, transactions);
+      }
+
+      /**
+       * Delete a transaction by id.
+       * @param {string} id
+       */
+      function deleteTransaction(id) {
+        transactions = transactions.filter(function (tx) { return tx.id !== id; });
+        StorageModule.save(STORAGE_KEYS.transactions, transactions);
+      }
+
+      /**
+       * Add a custom category.
+       * @param {string} name
+       */
+      function addCategory(name) {
+        categories.push(name);
+        StorageModule.save(STORAGE_KEYS.categories, categories);
+      }
+
+      /**
+       * Set the active theme and persist it.
+       * @param {'light'|'dark'} newTheme
+       */
+      function setTheme(newTheme) {
+        theme = newTheme;
+        StorageModule.save(STORAGE_KEYS.theme, theme);
+      }
+
+      /**
+       * Return the sum of all transaction amounts.
+       * @returns {number}
+       */
+      function getBalance() {
+        return transactions.reduce(function (sum, tx) { return sum + tx.amount; }, 0);
+      }
+
+      /**
+       * Return an object mapping each category to its total spending.
+       * @returns {{ [category: string]: number }}
+       */
+      function getSpendingByCategory() {
+        return transactions.reduce(function (acc, tx) {
+          acc[tx.category] = (acc[tx.category] || 0) + tx.amount;
+          return acc;
+        }, {});
+      }
+
+      /**
+       * Return monthly summary entries sorted descending (most recent first).
+       * Each entry: { label, year, month, total }
+       * @returns {Array<{ label: string, year: number, month: number, total: number }>}
+       */
+      function getMonthlySummary() {
+        var MONTH_NAMES = [
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+
+        var map = {};
+        transactions.forEach(function (tx) {
+          var d     = new Date(tx.date);
+          var year  = d.getFullYear();
+          var month = d.getMonth(); // 0-indexed
+          var key   = year + '-' + month;
+          if (!map[key]) {
+            map[key] = { label: MONTH_NAMES[month] + ' ' + year, year: year, month: month, total: 0 };
+          }
+          map[key].total += tx.amount;
+        });
+
+        return Object.keys(map)
+          .map(function (k) { return map[k]; })
+          .sort(function (a, b) {
+            if (b.year !== a.year) { return b.year - a.year; }
+            return b.month - a.month;
+          });
+      }
+
+      return {
+        get transactions() { return transactions; },
+        get categories()   { return categories; },
+        get theme()        { return theme; },
+        addTransaction:       addTransaction,
+        deleteTransaction:    deleteTransaction,
+        addCategory:          addCategory,
+        setTheme:             setTheme,
+        getBalance:           getBalance,
+        getSpendingByCategory: getSpendingByCategory,
+        getMonthlySummary:    getMonthlySummary
+      };
+    })();
+
+    // =============================================
+    // Validation Module — pure input validation
+    // Requirements: 1.3, 1.4, 1.5, 2.3, 2.4
+    // =============================================
+    var Validation = (function () {
+      /**
+       * Validate a transaction item name.
+       * Rejects empty strings and whitespace-only strings.
+       * @param {string} name
+       * @returns {{ valid: boolean, error: string }}
+       */
+      function validateItemName(name) {
+        if (typeof name !== 'string' || name.trim() === '') {
+          return { valid: false, error: 'Item name is required.' };
+        }
+        return { valid: true, error: '' };
+      }
+
+      /**
+       * Validate a transaction amount.
+       * Rejects zero, negative, and non-numeric values.
+       * The amount parameter may be a string from form input.
+       * @param {string|number} amount
+       * @returns {{ valid: boolean, error: string }}
+       */
+      function validateAmount(amount) {
+        var num = Number(amount);
+        if (amount === '' || amount === null || amount === undefined || isNaN(num)) {
+          return { valid: false, error: 'Amount must be a valid number.' };
+        }
+        if (num <= 0) {
+          return { valid: false, error: 'Amount must be greater than zero.' };
+        }
+        return { valid: true, error: '' };
+      }
+
+      /**
+       * Validate that a category exists in the provided categories list.
+       * @param {string} category
+       * @param {string[]} categories
+       * @returns {{ valid: boolean, error: string }}
+       */
+      function validateCategory(category, categories) {
+        if (!category || !Array.isArray(categories) || categories.indexOf(category) === -1) {
+          return { valid: false, error: 'Please select a valid category.' };
+        }
+        return { valid: true, error: '' };
+      }
+
+      /**
+       * Validate a new category name.
+       * Rejects empty/whitespace-only names and case-insensitive duplicates.
+       * @param {string} name
+       * @param {string[]} existing
+       * @returns {{ valid: boolean, error: string }}
+       */
+      function validateCategoryName(name, existing) {
+        if (typeof name !== 'string' || name.trim() === '') {
+          return { valid: false, error: 'Category name is required.' };
+        }
+        var normalized = name.trim().toLowerCase();
+        if (Array.isArray(existing)) {
+          for (var i = 0; i < existing.length; i++) {
+            if (existing[i].toLowerCase() === normalized) {
+              return { valid: false, error: 'Category already exists.' };
+            }
+          }
+        }
+        return { valid: true, error: '' };
+      }
+
+      return {
+        validateItemName:     validateItemName,
+        validateAmount:       validateAmount,
+        validateCategory:     validateCategory,
+        validateCategoryName: validateCategoryName
+      };
+    })();
+
+    // =============================================
+    // TransactionForm — renders the add-transaction form
+    // Requirements: 1.1, 1.3, 1.4, 1.5, 1.6
+    // =============================================
+    var TransactionForm = (function () {
+      var _container = null;
+
+      /**
+       * Build and inject the form HTML into the container.
+       * @param {HTMLElement} container
+       * @param {string[]} categories  - current categories list
+       */
+      function render(container, categories) {
+        _container = container;
+
+        var options = categories.map(function (cat) {
+          return '<option value="' + _escapeHtml(cat) + '">' + _escapeHtml(cat) + '</option>';
+        }).join('');
+
+        container.innerHTML =
+          '<form id="transaction-form" class="transaction-form" novalidate aria-label="Add transaction">' +
+            '<div class="form-group">' +
+              '<label for="tx-name">Item Name</label>' +
+              '<input' +
+                ' type="text"' +
+                ' id="tx-name"' +
+                ' name="name"' +
+                ' placeholder="e.g. Coffee"' +
+                ' autocomplete="off"' +
+                ' aria-describedby="tx-name-error"' +
+              ' />' +
+              '<span id="tx-name-error" class="form-error" role="alert" aria-live="polite"></span>' +
+            '</div>' +
+            '<div class="form-group">' +
+              '<label for="tx-amount">Amount</label>' +
+              '<input' +
+                ' type="number"' +
+                ' id="tx-amount"' +
+                ' name="amount"' +
+                ' placeholder="0.00"' +
+                ' min="0.01"' +
+                ' step="0.01"' +
+                ' aria-describedby="tx-amount-error"' +
+              ' />' +
+              '<span id="tx-amount-error" class="form-error" role="alert" aria-live="polite"></span>' +
+            '</div>' +
+            '<div class="form-group">' +
+              '<label for="tx-category">Category</label>' +
+              '<select id="tx-category" name="category" aria-describedby="tx-category-error">' +
+                '<option value="">— Select a category —</option>' +
+                options +
+              '</select>' +
+              '<span id="tx-category-error" class="form-error" role="alert" aria-live="polite"></span>' +
+            '</div>' +
+            '<button type="submit" class="btn btn--primary">Add Transaction</button>' +
+          '</form>';
+
+        container.querySelector('#transaction-form').addEventListener('submit', _handleSubmit);
+      }
+
+      /**
+       * Refresh only the category <select> options without re-rendering the whole form.
+       * Preserves any currently entered values in the other fields.
+       * @param {string[]} categories
+       */
+      function updateCategories(categories) {
+        var select = _container && _container.querySelector('#tx-category');
+        if (!select) { return; }
+        var current = select.value;
+        var options = '<option value="">— Select a category —</option>' +
+          categories.map(function (cat) {
+            return '<option value="' + _escapeHtml(cat) + '"' +
+              (cat === current ? ' selected' : '') +
+              '>' + _escapeHtml(cat) + '</option>';
+          }).join('');
+        select.innerHTML = options;
+      }
+
+      // ---- private helpers ----
+
+      function _handleSubmit(e) {
+        e.preventDefault();
+        var form = e.target;
+
+        var nameInput     = form.querySelector('#tx-name');
+        var amountInput   = form.querySelector('#tx-amount');
+        var categoryInput = form.querySelector('#tx-category');
+
+        var nameResult     = Validation.validateItemName(nameInput.value);
+        var amountResult   = Validation.validateAmount(amountInput.value);
+        var categoryResult = Validation.validateCategory(categoryInput.value, State.categories);
+
+        _setFieldError(nameInput,     'tx-name-error',     nameResult);
+        _setFieldError(amountInput,   'tx-amount-error',   amountResult);
+        _setFieldError(categoryInput, 'tx-category-error', categoryResult);
+
+        if (!nameResult.valid || !amountResult.valid || !categoryResult.valid) {
+          return;
+        }
+
+        AppController.handleAddTransaction({
+          name:     nameInput.value.trim(),
+          amount:   parseFloat(amountInput.value),
+          category: categoryInput.value
+        });
+
+        // Clear form fields after successful submission (Requirement 1.6)
+        nameInput.value     = '';
+        amountInput.value   = '';
+        categoryInput.value = '';
+        _clearFieldError(nameInput,     'tx-name-error');
+        _clearFieldError(amountInput,   'tx-amount-error');
+        _clearFieldError(categoryInput, 'tx-category-error');
+        nameInput.focus();
+      }
+
+      function _setFieldError(input, errorId, result) {
+        var errorEl = document.getElementById(errorId);
+        if (result.valid) {
+          input.removeAttribute('aria-invalid');
+          if (errorEl) { errorEl.textContent = ''; }
+        } else {
+          input.setAttribute('aria-invalid', 'true');
+          if (errorEl) { errorEl.textContent = result.error; }
+        }
+      }
+
+      function _clearFieldError(input, errorId) {
+        input.removeAttribute('aria-invalid');
+        var errorEl = document.getElementById(errorId);
+        if (errorEl) { errorEl.textContent = ''; }
+      }
+
+      function _escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      return {
+        render:           render,
+        updateCategories: updateCategories
+      };
+    })();
+
+    // =============================================
+    // CategoryManager — renders the custom category input and list
+    // Requirements: 2.1, 2.2, 2.3, 2.4, 2.5
+    // =============================================
+    var CategoryManager = (function () {
+      var _container = null;
+
+      /**
+       * Build and inject the category manager HTML into the container.
+       * @param {HTMLElement} container
+       * @param {string[]} categories  - current categories list
+       */
+      function render(container, categories) {
+        _container = container;
+
+        var listItems = categories.map(function (cat) {
+          return '<li class="category-tag">' + _escapeHtml(cat) + '</li>';
+        }).join('');
+
+        container.innerHTML =
+          '<div class="category-form">' +
+            '<input' +
+              ' type="text"' +
+              ' id="category-name-input"' +
+              ' placeholder="New category name"' +
+              ' autocomplete="off"' +
+              ' aria-label="New category name"' +
+              ' aria-describedby="category-name-error"' +
+            ' />' +
+            '<button type="button" id="category-add-btn" class="btn btn--primary">Add</button>' +
+          '</div>' +
+          '<span id="category-name-error" class="form-error" role="alert" aria-live="polite"></span>' +
+          '<ul id="category-list" class="category-list" aria-label="Category list">' +
+            listItems +
+          '</ul>';
+
+        container.querySelector('#category-add-btn').addEventListener('click', _handleAdd);
+        container.querySelector('#category-name-input').addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            _handleAdd();
+          }
+        });
+      }
+
+      /**
+       * Re-render only the category list (tags) without touching the input.
+       * @param {string[]} categories
+       */
+      function _refreshList(categories) {
+        var list = _container && _container.querySelector('#category-list');
+        if (!list) { return; }
+        list.innerHTML = categories.map(function (cat) {
+          return '<li class="category-tag">' + _escapeHtml(cat) + '</li>';
+        }).join('');
+      }
+
+      // ---- private helpers ----
+
+      function _handleAdd() {
+        var input   = _container && _container.querySelector('#category-name-input');
+        var errorEl = _container && _container.querySelector('#category-name-error');
+        if (!input) { return; }
+
+        var result = Validation.validateCategoryName(input.value, State.categories);
+
+        if (!result.valid) {
+          input.setAttribute('aria-invalid', 'true');
+          if (errorEl) { errorEl.textContent = result.error; }
+          return;
+        }
+
+        // Clear any previous error
+        input.removeAttribute('aria-invalid');
+        if (errorEl) { errorEl.textContent = ''; }
+
+        AppController.handleAddCategory(input.value.trim());
+
+        // Re-render the category list and update TransactionForm's <select>
+        _refreshList(State.categories);
+        TransactionForm.updateCategories(State.categories);
+
+        input.value = '';
+        input.focus();
+      }
+
+      function _escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      return {
+        render: render
+      };
+    })();
+
+    // =============================================
+    // TransactionList — renders all transactions ordered most-recent-first
+    // Requirements: 3.1, 3.2, 3.3, 3.4
+    // =============================================
+    var TransactionList = (function () {
+      /**
+       * Render all transactions into the container, sorted most-recent-first.
+       * @param {HTMLElement} container
+       * @param {Array<{ id: string, name: string, amount: number, category: string, date: string }>} transactions
+       */
+      function render(container, transactions) {
+        var list = container.querySelector('#transaction-list');
+        if (!list) {
+          // Fallback: use the container itself
+          list = container;
+        }
+
+        if (!transactions || transactions.length === 0) {
+          list.innerHTML = '<li class="transaction-list-empty">No transactions yet.</li>';
+          return;
+        }
+
+        // Sort descending by date (most-recent-first) — Requirement 3.1
+        var sorted = transactions.slice().sort(function (a, b) {
+          return new Date(b.date) - new Date(a.date);
+        });
+
+        list.innerHTML = sorted.map(function (tx) {
+          return (
+            '<li class="transaction-item" data-id="' + _escapeHtml(tx.id) + '">' +
+              '<div class="transaction-item__info">' +
+                '<div class="transaction-item__name">' + _escapeHtml(tx.name) + '</div>' +
+                '<div class="transaction-item__meta">' + _escapeHtml(tx.category) + '</div>' +
+              '</div>' +
+              '<span class="transaction-item__amount">$' + Number(tx.amount).toFixed(2) + '</span>' +
+              '<button' +
+                ' type="button"' +
+                ' class="btn btn--danger"' +
+                ' aria-label="Delete transaction ' + _escapeHtml(tx.name) + '"' +
+                ' data-id="' + _escapeHtml(tx.id) + '"' +
+              '>Delete</button>' +
+            '</li>'
+          );
+        }).join('');
+
+        // Attach delete button listeners — Requirement 3.3
+        list.querySelectorAll('.btn--danger[data-id]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            AppController.handleDeleteTransaction(btn.getAttribute('data-id'));
+          });
+        });
+      }
+
+      function _escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      return {
+        render: render
+      };
+    })();
+
+    // =============================================
+    // BalanceDisplay — renders the current total balance
+    // Requirements: 4.1, 4.4
+    // =============================================
+    var BalanceDisplay = (function () {
+      /**
+       * Render the current balance into the container element.
+       * Reads State.getBalance() and writes the formatted value.
+       * @param {HTMLElement} container
+       */
+      function render(container) {
+        var balance = State.getBalance();
+        var amountEl = container.querySelector('.balance-display__amount');
+        if (amountEl) {
+          amountEl.textContent = '$' + balance.toFixed(2);
+        } else {
+          container.innerHTML =
+            '<p class="balance-display__label">Total Spending</p>' +
+            '<p class="balance-display__amount" aria-live="polite" aria-atomic="true">$' +
+              balance.toFixed(2) +
+            '</p>';
+        }
+      }
+
+      return {
+        render: render
+      };
+    })();
+
+    // =============================================
+    // PieChart — renders a pie chart onto a <canvas> element
+    // Requirements: 5.1, 5.2, 5.3, 5.4, 5.5
+    // =============================================
+    var PieChart = (function () {
+      var CHART_COLORS = [
+        '#4e79a7', '#f28e2b', '#e15759', '#76b7b2',
+        '#59a14f', '#edc948', '#b07aa1', '#ff9da7',
+        '#9c755f', '#bab0ac', '#d37295', '#a0cbe8'
+      ];
+
+      /**
+       * Render the pie chart and legend into the container.
+       * Reads State.getSpendingByCategory() for data.
+       * @param {HTMLElement} container
+       */
+      function render(container) {
+        var canvas = container.querySelector('#pie-chart-canvas');
+        var legendEl = container.querySelector('#pie-chart-legend');
+        if (!canvas) { return; }
+
+        var ctx = canvas.getContext('2d');
+        var width = canvas.width;
+        var height = canvas.height;
+
+        // Clear previous drawing
+        ctx.clearRect(0, 0, width, height);
+
+        var spending = State.getSpendingByCategory();
+        var categories = Object.keys(spending).filter(function (cat) {
+          return spending[cat] > 0;
+        });
+
+        var grandTotal = categories.reduce(function (sum, cat) {
+          return sum + spending[cat];
+        }, 0);
+
+        // Empty state — Requirement 5.3
+        if (grandTotal === 0) {
+          ctx.fillStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue('--color-text-muted').trim() || '#6b7280';
+          ctx.font = '14px ' + (getComputedStyle(document.documentElement)
+            .getPropertyValue('--font-family').trim() || 'system-ui, sans-serif');
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('No data yet', width / 2, height / 2);
+          if (legendEl) { legendEl.innerHTML = ''; }
+          return;
+        }
+
+        // Draw pie slices — Requirements 5.1, 5.4
+        var cx = width / 2;
+        var cy = height / 2;
+        var radius = Math.min(cx, cy) - 4;
+        var currentAngle = -Math.PI / 2; // start at top
+
+        categories.forEach(function (cat, index) {
+          var sliceAngle = (spending[cat] / grandTotal) * 2 * Math.PI;
+          var color = CHART_COLORS[index % CHART_COLORS.length];
+
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.arc(cx, cy, radius, currentAngle, currentAngle + sliceAngle);
+          ctx.closePath();
+          ctx.fillStyle = color;
+          ctx.fill();
+
+          // Thin separator stroke for visual clarity
+          ctx.strokeStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue('--color-surface').trim() || '#ffffff';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          currentAngle += sliceAngle;
+        });
+
+        // Draw legend — Requirement 5.5
+        if (legendEl) {
+          legendEl.innerHTML = categories.map(function (cat, index) {
+            var color = CHART_COLORS[index % CHART_COLORS.length];
+            return (
+              '<div class="pie-chart-legend__item">' +
+                '<span class="pie-chart-legend__swatch" style="background-color:' + color + '" aria-hidden="true"></span>' +
+                '<span>' + _escapeHtml(cat) + '</span>' +
+              '</div>'
+            );
+          }).join('');
+        }
+      }
+
+      function _escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      return {
+        render: render,
+        CHART_COLORS: CHART_COLORS
+      };
+    })();
+
+    // =============================================
+    // MonthlySummary — renders monthly spending totals
+    // Requirements: 6.1, 6.2, 6.3
+    // =============================================
+    var MonthlySummary = (function () {
+      /**
+       * Render the monthly summary table into the container.
+       * @param {HTMLElement} container
+       * @param {Array<{ label: string, year: number, month: number, total: number }>} data
+       */
+      function render(container, data) {
+        if (!container) { return; }
+
+        // Only show months that have at least one transaction (data already filtered)
+        if (!data || data.length === 0) {
+          container.innerHTML =
+            '<p class="monthly-summary-empty">No transactions yet.</p>';
+          return;
+        }
+
+        var rows = data.map(function (entry) {
+          return (
+            '<tr>' +
+              '<td>' + _escapeHtml(entry.label) + '</td>' +
+              '<td>$' + Number(entry.total).toFixed(2) + '</td>' +
+            '</tr>'
+          );
+        }).join('');
+
+        container.innerHTML =
+          '<table class="monthly-summary-table" aria-label="Monthly spending summary">' +
+            '<thead>' +
+              '<tr>' +
+                '<th scope="col">Month</th>' +
+                '<th scope="col">Total</th>' +
+              '</tr>' +
+            '</thead>' +
+            '<tbody>' +
+              rows +
+            '</tbody>' +
+          '</table>';
+      }
+
+      function _escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      return {
+        render: render
+      };
+    })();
+
+    // =============================================
+    // ThemeToggle — renders a toggle button for dark/light mode
+    // Requirements: 7.1, 7.2, 7.3
+    // =============================================
+    var ThemeToggle = (function () {
+      /**
+       * Render the theme toggle button into the container.
+       * @param {HTMLElement} container
+       * @param {{ theme: 'light'|'dark' }} state
+       */
+      function render(container, state) {
+        if (!container) { return; }
+
+        var isDark = state && state.theme === 'dark';
+        var label = isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+        var icon  = isDark ? '☀️' : '🌙';
+
+        container.innerHTML =
+          '<button' +
+            ' type="button"' +
+            ' id="theme-toggle-btn"' +
+            ' class="btn btn--icon theme-toggle__btn"' +
+            ' aria-label="' + label + '"' +
+            ' title="' + label + '"' +
+          '>' +
+            '<span aria-hidden="true">' + icon + '</span>' +
+            '<span class="visually-hidden">' + label + '</span>' +
+          '</button>';
+
+        // Apply the active theme to <html>
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+
+        container.querySelector('#theme-toggle-btn').addEventListener('click', function () {
+          AppController.handleThemeToggle();
+        });
+      }
+
+      return {
+        render: render
+      };
+    })();
+
+    // =============================================
+    // AppController — orchestrates state, persistence, and UI re-renders
+    // Requirements: 1.2, 2.2, 3.3, 4.2, 4.3, 5.2, 7.4, 7.5, 9.1, 9.2, 9.3, 9.4
+    // =============================================
+    var AppController = (function () {
+      /**
+       * Bootstrap the application:
+       *  - Check localStorage availability and show banner if unavailable
+       *  - State is already loaded from localStorage by the State IIFE
+       *  - Restore saved theme on <html>
+       *  - Render all UI components into their containers
+       */
+      function init() {
+        // Requirement 9.4 — show banner when localStorage is unavailable
+        if (!StorageModule.isAvailable()) {
+          var banner = document.getElementById('storage-banner');
+          if (banner) {
+            banner.setAttribute('aria-hidden', 'false');
+          }
+        }
+
+        // Requirement 7.5 — restore saved theme
+        document.documentElement.setAttribute('data-theme', State.theme);
+
+        // Render ThemeToggle (also re-applies theme attribute)
+        var themeToggleContainer = document.getElementById('theme-toggle-container');
+        if (themeToggleContainer) {
+          ThemeToggle.render(themeToggleContainer, { theme: State.theme });
+        }
+
+        // Render TransactionForm with current categories
+        var txFormContainer = document.getElementById('transaction-form-container');
+        if (txFormContainer) {
+          TransactionForm.render(txFormContainer, State.categories);
+        }
+
+        // Render CategoryManager
+        var categoryContainer = document.getElementById('category-manager-container');
+        if (categoryContainer) {
+          CategoryManager.render(categoryContainer, State.categories);
+        }
+
+        // Render TransactionList
+        var txListContainer = document.getElementById('transaction-list-container');
+        if (txListContainer) {
+          TransactionList.render(txListContainer, State.transactions);
+        }
+
+        // Render BalanceDisplay
+        var balanceContainer = document.getElementById('balance-display-container');
+        if (balanceContainer) {
+          BalanceDisplay.render(balanceContainer);
+        }
+
+        // Render PieChart
+        var pieChartContainer = document.getElementById('pie-chart-container');
+        if (pieChartContainer) {
+          PieChart.render(pieChartContainer);
+        }
+
+        // Render MonthlySummary
+        var summaryContainer = document.getElementById('monthly-summary-container');
+        if (summaryContainer) {
+          MonthlySummary.render(summaryContainer, State.getMonthlySummary());
+        }
+      }
+
+      /**
+       * Validate, create, and persist a new transaction, then re-render affected components.
+       * Requirements: 1.2, 4.2, 5.2, 9.1
+       * @param {{ name: string, amount: string|number, category: string }} formData
+       * @returns {{ success: boolean, errors?: Object }}
+       */
+      function handleAddTransaction(formData) {
+        var nameResult     = Validation.validateItemName(formData.name);
+        var amountResult   = Validation.validateAmount(formData.amount);
+        var categoryResult = Validation.validateCategory(formData.category, State.categories);
+
+        if (!nameResult.valid || !amountResult.valid || !categoryResult.valid) {
+          return {
+            success: false,
+            errors: {
+              name:     nameResult.error     || '',
+              amount:   amountResult.error   || '',
+              category: categoryResult.error || ''
+            }
+          };
+        }
+
+        var tx = {
+          id:       Date.now().toString(36) + Math.random().toString(36).slice(2),
+          name:     formData.name.trim(),
+          amount:   parseFloat(formData.amount),
+          category: formData.category,
+          date:     new Date().toISOString()
+        };
+
+        State.addTransaction(tx);
+        StorageModule.save('evb_transactions', State.transactions);
+
+        _rerenderTransactionViews();
+
+        return { success: true };
+      }
+
+      /**
+       * Delete a transaction by id, persist, and re-render affected components.
+       * Requirements: 3.3, 4.3, 9.1
+       * @param {string} id
+       */
+      function handleDeleteTransaction(id) {
+        State.deleteTransaction(id);
+        StorageModule.save('evb_transactions', State.transactions);
+        _rerenderTransactionViews();
+      }
+
+      /**
+       * Validate and add a new category, persist, and re-render affected components.
+       * Requirements: 2.2, 9.2
+       * @param {string} name
+       * @returns {{ success: boolean, error?: string }}
+       */
+      function handleAddCategory(name) {
+        var result = Validation.validateCategoryName(name, State.categories);
+        if (!result.valid) {
+          return { success: false, error: result.error };
+        }
+
+        State.addCategory(name.trim());
+        StorageModule.save('evb_categories', State.categories);
+
+        // Re-render CategoryManager and update TransactionForm's <select>
+        var categoryContainer = document.getElementById('category-manager-container');
+        if (categoryContainer) {
+          CategoryManager.render(categoryContainer, State.categories);
+        }
+
+        var txFormContainer = document.getElementById('transaction-form-container');
+        if (txFormContainer) {
+          TransactionForm.updateCategories(State.categories);
+        }
+
+        return { success: true };
+      }
+
+      /**
+       * Toggle theme between light and dark, persist, apply to DOM, and re-render ThemeToggle.
+       * Requirements: 7.4, 7.5
+       */
+      function handleThemeToggle() {
+        var newTheme = State.theme === 'light' ? 'dark' : 'light';
+        State.setTheme(newTheme);
+        StorageModule.save('evb_theme', State.theme);
+        document.documentElement.setAttribute('data-theme', State.theme);
+
+        var themeToggleContainer = document.getElementById('theme-toggle-container');
+        if (themeToggleContainer) {
+          ThemeToggle.render(themeToggleContainer, { theme: State.theme });
+        }
+      }
+
+      /**
+       * Switch between the main view and the monthly summary section.
+       * 'main'    — shows main content grid, hides/minimizes monthly summary section
+       * 'monthly' — shows monthly summary section prominently, hides main content grid
+       * Requirements: 6.2
+       * @param {'main'|'monthly'} view
+       */
+      function handleViewChange(view) {
+        var appMain     = document.getElementById('app-main');
+        var summarySection = document.querySelector('.summary-section');
+
+        if (view === 'monthly') {
+          if (appMain)        { appMain.style.display = 'none'; }
+          if (summarySection) {
+            summarySection.style.display = 'block';
+            // Re-render with latest data when switching to monthly view
+            var summaryContainer = document.getElementById('monthly-summary-container');
+            if (summaryContainer) {
+              MonthlySummary.render(summaryContainer, State.getMonthlySummary());
+            }
+          }
+        } else {
+          // Default: 'main'
+          if (appMain)        { appMain.style.display = ''; }
+          if (summarySection) { summarySection.style.display = ''; }
+        }
+      }
+
+      // ---- private helpers ----
+
+      /**
+       * Re-render all components that depend on the transaction list.
+       */
+      function _rerenderTransactionViews() {
+        var txListContainer = document.getElementById('transaction-list-container');
+        if (txListContainer) {
+          TransactionList.render(txListContainer, State.transactions);
+        }
+
+        var balanceContainer = document.getElementById('balance-display-container');
+        if (balanceContainer) {
+          BalanceDisplay.render(balanceContainer);
+        }
+
+        var pieChartContainer = document.getElementById('pie-chart-container');
+        if (pieChartContainer) {
+          PieChart.render(pieChartContainer);
+        }
+
+        var summaryContainer = document.getElementById('monthly-summary-container');
+        if (summaryContainer) {
+          MonthlySummary.render(summaryContainer, State.getMonthlySummary());
+        }
+      }
+
+      return {
+        init:                    init,
+        handleAddTransaction:    handleAddTransaction,
+        handleDeleteTransaction: handleDeleteTransaction,
+        handleAddCategory:       handleAddCategory,
+        handleThemeToggle:       handleThemeToggle,
+        handleViewChange:        handleViewChange
+      };
+    })();
+
+    // Bootstrap the app on DOM ready
+    document.addEventListener('DOMContentLoaded', function () {
+      AppController.init();
+    });
+  </script>
+</body>
+</html>
