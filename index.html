@@ -38,15 +38,13 @@
         </div>
       </section>
 
-      <!-- Transaction Form + Category Manager -->
+      <!-- Transaction Form + Category Manager (merged) -->
       <section class="form-section card" aria-labelledby="form-heading">
         <h2 id="form-heading" class="card__title">Add Transaction</h2>
         <div id="transaction-form-container"></div>
-
-        <hr style="border:none; border-top:1px solid var(--color-border); margin: var(--spacing-lg) 0;" />
-
+        <hr class="section-divider" />
         <h3 class="card__title" id="category-heading">Manage Categories</h3>
-        <div id="category-manager-container" class="category-section" aria-labelledby="category-heading"></div>
+        <div id="category-manager-container" aria-labelledby="category-heading"></div>
       </section>
 
       <!-- Pie Chart -->
@@ -65,9 +63,30 @@
         </div>
       </section>
 
-      <!-- Transaction List -->
+      <!-- Transaction List (full width) -->
       <section class="list-section card" aria-labelledby="list-heading">
-        <h2 id="list-heading" class="card__title">Transactions</h2>
+        <div class="list-section__header">
+          <h2 id="list-heading" class="card__title">Transactions</h2>
+          <div class="list-sort-controls" role="group" aria-label="Sort transactions">
+            <span class="list-sort-label">Sort by:</span>
+            <button type="button" class="btn btn--sort active" data-sort="date">Date<span class="sort-arrow"> ↓</span></button>
+            <button type="button" class="btn btn--sort" data-sort="amount">Amount<span class="sort-arrow"></span></button>
+            <button type="button" class="btn btn--sort" data-sort="category">Category<span class="sort-arrow"></span></button>
+          </div>
+        </div>
+        <div class="list-section__filters">
+          <input
+            type="text"
+            id="tx-search"
+            class="list-search-input"
+            placeholder="Search by name…"
+            aria-label="Search transactions by name"
+            autocomplete="off"
+          />
+          <select id="tx-filter-category" class="list-filter-select" aria-label="Filter by category">
+            <option value="">All Categories</option>
+          </select>
+        </div>
         <div id="transaction-list-container">
           <ul
             id="transaction-list"
@@ -78,11 +97,7 @@
         </div>
       </section>
 
-      <!-- Monthly Summary -->
-      <section class="summary-section card" aria-labelledby="summary-heading">
-        <h2 id="summary-heading" class="card__title">Monthly Summary</h2>
-        <div id="monthly-summary-container"></div>
-      </section>
+      <!-- Monthly Summary removed -->
 
     </main>
   </div>

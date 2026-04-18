@@ -41,7 +41,7 @@ var StorageModule = (function () {
 // Requirements: 1.2, 2.1, 3.1, 4.1, 5.1, 6.1, 9.3
 // =============================================
 var State = (function () {
-  var DEFAULT_CATEGORIES = ['Food', 'Transport', 'Housing', 'Entertainment', 'Health', 'Other'];
+  var DEFAULT_CATEGORIES = ['Food', 'Transport', 'Housing', 'Entertainment', 'Health', 'Investment'];
 
   var STORAGE_KEYS = {
     transactions: 'evb_transactions',
@@ -87,6 +87,11 @@ var State = (function () {
 
   function addCategory(name) {
     categories.push(name);
+    StorageModule.save(STORAGE_KEYS.categories, categories);
+  }
+
+  function deleteCategory(name) {
+    categories = categories.filter(function (c) { return c !== name; });
     StorageModule.save(STORAGE_KEYS.categories, categories);
   }
 
@@ -139,6 +144,7 @@ var State = (function () {
     addTransaction:        addTransaction,
     deleteTransaction:     deleteTransaction,
     addCategory:           addCategory,
+    deleteCategory:        deleteCategory,
     setTheme:              setTheme,
     getBalance:            getBalance,
     getSpendingByCategory: getSpendingByCategory,
@@ -318,12 +324,19 @@ var TransactionForm = (function () {
 // =============================================
 var CategoryManager = (function () {
   var _container = null;
+  var DEFAULT_CATEGORIES = ['Food', 'Transport', 'Housing', 'Entertainment', 'Health', 'Investment'];
 
   function render(container, categories) {
     _container = container;
 
     var listItems = categories.map(function (cat) {
-      return '<li class="category-tag">' + _escapeHtml(cat) + '</li>';
+      var isDefault = DEFAULT_CATEGORIES.indexOf(cat) !== -1;
+      return (
+        '<li class="category-tag' + (isDefault ? ' category-tag--default' : '') + '" data-cat="' + _escapeHtml(cat) + '">' +
+          '<span class="category-tag__name">' + _escapeHtml(cat) + '</span>' +
+          '<button type="button" class="category-tag__delete" aria-label="Delete category ' + _escapeHtml(cat) + '" title="Delete">✕</button>' +
+        '</li>'
+      );
     }).join('');
 
     container.innerHTML =
@@ -340,13 +353,28 @@ var CategoryManager = (function () {
     container.querySelector('#category-name-input').addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); _handleAdd(); }
     });
+
+    container.querySelector('#category-list').addEventListener('click', function (e) {
+      var btn = e.target.closest('.category-tag__delete');
+      if (!btn) { return; }
+      var tag = btn.closest('.category-tag');
+      if (!tag) { return; }
+      var cat = tag.getAttribute('data-cat');
+      AppController.handleDeleteCategory(cat);
+    });
   }
 
   function _refreshList(categories) {
     var list = _container && _container.querySelector('#category-list');
     if (!list) { return; }
     list.innerHTML = categories.map(function (cat) {
-      return '<li class="category-tag">' + _escapeHtml(cat) + '</li>';
+      var isDefault = DEFAULT_CATEGORIES.indexOf(cat) !== -1;
+      return (
+        '<li class="category-tag' + (isDefault ? ' category-tag--default' : '') + '" data-cat="' + _escapeHtml(cat) + '">' +
+          '<span class="category-tag__name">' + _escapeHtml(cat) + '</span>' +
+          '<button type="button" class="category-tag__delete" aria-label="Delete category ' + _escapeHtml(cat) + '" title="Delete">✕</button>' +
+        '</li>'
+      );
     }).join('');
   }
 
@@ -386,43 +414,130 @@ var CategoryManager = (function () {
 })();
 
 // =============================================
-// TransactionList — renders all transactions ordered most-recent-first
+// TransactionList — renders all transactions with sort, search, filter
 // Requirements: 3.1, 3.2, 3.3, 3.4
 // =============================================
 var TransactionList = (function () {
+  var _currentSort = 'date';
+  var _sortDir     = { date: 'desc', amount: 'desc', category: 'asc' };
+  var _search      = '';
+  var _filterCat   = '';
+  var _container   = null;
+
   function render(container, transactions) {
+    _container = container;
     var list = container.querySelector('#transaction-list') || container;
 
-    if (!transactions || transactions.length === 0) {
-      list.innerHTML = '<li class="transaction-list-empty">No transactions yet.</li>';
+    // Wire sort buttons
+    var sortBtns = document.querySelectorAll('.btn--sort');
+    sortBtns.forEach(function (btn) {
+      btn.onclick = function () {
+        var key = btn.getAttribute('data-sort');
+        if (_currentSort === key) {
+          _sortDir[key] = _sortDir[key] === 'asc' ? 'desc' : 'asc';
+        } else {
+          _currentSort = key;
+        }
+        _updateSortUI(sortBtns);
+        render(container, State.transactions);
+      };
+    });
+    _updateSortUI(sortBtns);
+
+    // Wire search input
+    var searchInput = document.getElementById('tx-search');
+    if (searchInput && !searchInput._wired) {
+      searchInput._wired = true;
+      searchInput.addEventListener('input', function () {
+        _search = searchInput.value.trim().toLowerCase();
+        render(container, State.transactions);
+      });
+    }
+
+    // Populate and wire category filter
+    var filterSelect = document.getElementById('tx-filter-category');
+    if (filterSelect) {
+      var currentFilter = filterSelect.value || _filterCat;
+      filterSelect.innerHTML = '<option value="">All Categories</option>' +
+        State.categories.map(function (cat) {
+          return '<option value="' + _esc(cat) + '"' +
+            (cat === currentFilter ? ' selected' : '') +
+            '>' + _esc(cat) + '</option>';
+        }).join('');
+      _filterCat = filterSelect.value;
+      if (!filterSelect._wired) {
+        filterSelect._wired = true;
+        filterSelect.addEventListener('change', function () {
+          _filterCat = filterSelect.value;
+          render(container, State.transactions);
+        });
+      }
+    }
+
+    // Apply search + filter
+    var visible = (transactions || []).filter(function (tx) {
+      var matchSearch = !_search || tx.name.toLowerCase().indexOf(_search) !== -1;
+      var matchCat    = !_filterCat || tx.category === _filterCat;
+      return matchSearch && matchCat;
+    });
+
+    if (visible.length === 0) {
+      list.innerHTML = '<li class="transaction-list-empty">' +
+        (transactions && transactions.length ? 'No matching transactions.' : 'No transactions yet.') +
+        '</li>';
       return;
     }
 
-    var sorted = transactions.slice().sort(function (a, b) {
-      return new Date(b.date) - new Date(a.date);
+    var dir = _sortDir[_currentSort] === 'asc' ? 1 : -1;
+    var sorted = visible.slice().sort(function (a, b) {
+      if (_currentSort === 'amount')   { return dir * (a.amount - b.amount); }
+      if (_currentSort === 'category') { return dir * a.category.localeCompare(b.category); }
+      return dir * (new Date(a.date) - new Date(b.date));
     });
 
     list.innerHTML = sorted.map(function (tx) {
       return (
-        '<li class="transaction-item" data-id="' + _escapeHtml(tx.id) + '">' +
+        '<li class="transaction-item" data-id="' + _esc(tx.id) + '">' +
           '<div class="transaction-item__info">' +
-            '<div class="transaction-item__name">' + _escapeHtml(tx.name) + '</div>' +
-            '<div class="transaction-item__meta">' + _escapeHtml(tx.category) + '</div>' +
+            '<div class="transaction-item__name">' + _esc(tx.name) + '</div>' +
+            '<div class="transaction-item__meta">' +
+              _esc(tx.category) + ' &middot; ' + _formatDate(tx.date) +
+            '</div>' +
           '</div>' +
           '<span class="transaction-item__amount">$' + Number(tx.amount).toFixed(2) + '</span>' +
-          '<button type="button" class="btn btn--danger" aria-label="Delete transaction ' + _escapeHtml(tx.name) + '" data-id="' + _escapeHtml(tx.id) + '">Delete</button>' +
+          '<button type="button" class="btn btn--delete-icon" aria-label="Delete transaction ' + _esc(tx.name) + '" data-id="' + _esc(tx.id) + '" title="Delete">🗑</button>' +
         '</li>'
       );
     }).join('');
 
-    list.querySelectorAll('.btn--danger[data-id]').forEach(function (btn) {
+    list.querySelectorAll('.btn--delete-icon[data-id]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         AppController.handleDeleteTransaction(btn.getAttribute('data-id'));
       });
     });
   }
 
-  function _escapeHtml(str) {
+  function _updateSortUI(sortBtns) {
+    sortBtns.forEach(function (btn) {
+      var key = btn.getAttribute('data-sort');
+      if (key === _currentSort) {
+        btn.classList.add('active');
+        btn.querySelector('.sort-arrow').textContent = _sortDir[key] === 'asc' ? ' ↑' : ' ↓';
+      } else {
+        btn.classList.remove('active');
+        btn.querySelector('.sort-arrow').textContent = '';
+      }
+    });
+  }
+
+  function _formatDate(iso) {
+    var d    = new Date(iso);
+    var date = d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+    var time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    return date + ', ' + time;
+  }
+
+  function _esc(str) {
     return String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -516,11 +631,13 @@ var PieChart = (function () {
 
     if (legendEl) {
       legendEl.innerHTML = categories.map(function (cat, index) {
-        var color = CHART_COLORS[index % CHART_COLORS.length];
+        var color      = CHART_COLORS[index % CHART_COLORS.length];
+        var pct        = ((spending[cat] / grandTotal) * 100).toFixed(1);
         return (
           '<div class="pie-chart-legend__item">' +
             '<span class="pie-chart-legend__swatch" style="background-color:' + color + '" aria-hidden="true"></span>' +
-            '<span>' + _escapeHtml(cat) + '</span>' +
+            '<span class="pie-chart-legend__name">' + _escapeHtml(cat) + '</span>' +
+            '<span class="pie-chart-legend__pct">' + pct + '%</span>' +
           '</div>'
         );
       }).join('');
@@ -588,12 +705,12 @@ var ThemeToggle = (function () {
 
     var isDark = state && state.theme === 'dark';
     var label  = isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode';
-    var icon   = isDark ? '☀️' : '🌙';
+    var icon   = isDark ? '🌙' : '☀️';
 
     container.innerHTML =
-      '<button type="button" id="theme-toggle-btn" class="btn btn--icon theme-toggle__btn" aria-label="' + label + '" title="' + label + '">' +
-        '<span aria-hidden="true">' + icon + '</span>' +
-        '<span class="visually-hidden">' + label + '</span>' +
+      '<button type="button" id="theme-toggle-btn" class="btn theme-toggle__btn" aria-label="' + label + '" title="' + label + '">' +
+        '<span class="theme-toggle__icon" aria-hidden="true">' + icon + '</span>' +
+        '<span class="theme-toggle__label">' + (isDark ? 'Dark Mode' : 'Light Mode') + '</span>' +
       '</button>';
 
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
@@ -673,6 +790,26 @@ var AppController = (function () {
     _rerenderTransactionViews();
   }
 
+  function handleDeleteCategory(name) {
+    var DEFAULT_CATEGORIES = ['Food', 'Transport', 'Housing', 'Entertainment', 'Health', 'Investment'];
+    if (DEFAULT_CATEGORIES.indexOf(name) !== -1) { return; } // protect defaults
+
+    // Check if any transaction uses this category
+    var inUse = State.transactions.some(function (tx) { return tx.category === name; });
+    if (inUse) {
+      alert('Cannot delete "' + name + '" — it is used by existing transactions.');
+      return;
+    }
+
+    State.deleteCategory(name);
+
+    var categoryContainer = document.getElementById('category-manager-container');
+    if (categoryContainer) { CategoryManager.render(categoryContainer, State.categories); }
+
+    var txFormContainer = document.getElementById('transaction-form-container');
+    if (txFormContainer) { TransactionForm.updateCategories(State.categories); }
+  }
+
   function handleAddCategory(name) {
     var result = Validation.validateCategoryName(name, State.categories);
     if (!result.valid) { return { success: false, error: result.error }; }
@@ -733,6 +870,7 @@ var AppController = (function () {
     handleAddTransaction:    handleAddTransaction,
     handleDeleteTransaction: handleDeleteTransaction,
     handleAddCategory:       handleAddCategory,
+    handleDeleteCategory:    handleDeleteCategory,
     handleThemeToggle:       handleThemeToggle,
     handleViewChange:        handleViewChange
   };
